@@ -1,7 +1,7 @@
 const axios = require("axios");
 const apiKeyTrad = process.env.API_KEY;
 
-async function translate(text, targetLanguage) {
+export async function translate(text, targetLanguage) {
   const encodedParams = new URLSearchParams();
   encodedParams.append("q", text);
   encodedParams.append("target", targetLanguage);
@@ -21,6 +21,3 @@ async function translate(text, targetLanguage) {
   const response = await axios.request(options);
   return response.data;
 }
-//ok
-module.exports = translate;
-//export default translate

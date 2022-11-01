@@ -1,56 +1,75 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const search = require('../functions/seach');
-const translate = require('../functions/translate');
-//const {db} = require('../../databases')
-import {db} from '../databases'
+const search = require("../functions/seach");
+import axios from "axios";
+import { Translation, TranslationStorage } from "../storage/TranslationStorage";
+const apiKeyTrad = process.env.API_KEY;
 
-type translate = {
-
+class TranslationGateway {
+  async translate(text: string , targetLanguage: string)  {
+    const encodedParams = new URLSearchParams();
+    encodedParams.append("q", text);
+    encodedParams.append("target", targetLanguage);
+  
+    const options = {
+      method: "POST",
+      url: "https://google-translate1.p.rapidapi.com/language/translate/v2",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        "Accept-Encoding": "application/gzip",
+        "X-RapidAPI-Key": `${apiKeyTrad}`,
+        "X-RapidAPI-Host": "google-translate1.p.rapidapi.com",
+      },
+      data: encodedParams,
+    };
+  
+    const response = await axios.request(options);
+    return response.data;
+  }
 }
 
+const translationStorage = new TranslationStorage();
+const translationGateway = new TranslationGateway();
 
 router.post("/", async (req, res) => {
-    const body = {
-      text: req.body.text,
-      language: req.body.language,
-      email: req.body.email,
-    };
-  
-    const userData = req.user.userId ;
-    const userId = userData.uuid;
-    //const userId = req.user.userId
+  const body = {
+    text: req.body.text,
+    language: req.body.language,
+    email: req.body.email,
+  };
 
-    const isAlreadyTranslated = search(userId, body.text);
-    if (isAlreadyTranslated) {
-      return res.send({
-        originalText: body.text,
-        translatedText: isAlreadyTranslated.translation,
-        uuid: userId,
-      });
-    }
-    const translation = await translate(body.text, body.language);
-    const translatedText = translation.data.translations[0].translatedText;
-    const savedTranslation = {
-      originalText: body.text,
-      translation: translatedText,
-      language: body.language,
-    };
-  
-    const hasAlreadySavedTranslation = db.get(userId);
-    if (hasAlreadySavedTranslation) {
-      hasAlreadySavedTranslation.push(savedTranslation);
-      db.set(userId, hasAlreadySavedTranslation);
-    } else {
-      db.set(userId, [savedTranslation]);
-    }
-  
+  const userId = req.user.uuid;
+
+  const isAlreadyTranslated = search(userId, body.text);
+  if (isAlreadyTranslated) {
     return res.send({
       originalText: body.text,
-      translatedText: translatedText,
-      uuid: userId,
+      translatedText: isAlreadyTranslated.translation,
+      userId: userId,
     });
-  });
+  }
 
-  //module.exports = router;
-  export default router;
+  const translation = await translationGateway.translate(body.text, body.language);
+  const translatedText = translation.data.translations[0].translatedText;
+  const savedTranslation: Translation = {
+    originalText: body.text,
+    translation: translatedText,
+    language: body.language,
+  };
+
+  const hasAlreadySavedTranslation =
+    translationStorage.getTranslationById(userId);
+  
+    
+  if (hasAlreadySavedTranslation) {
+    hasAlreadySavedTranslation.push(savedTranslation);
+    translationStorage.saveTranslation(userId, hasAlreadySavedTranslation);
+  } else {
+    translationStorage.saveTranslation(userId, [savedTranslation]);
+  }
+  return res.send({
+    translatedText: translatedText,
+  });
+});
+
+export default router;
