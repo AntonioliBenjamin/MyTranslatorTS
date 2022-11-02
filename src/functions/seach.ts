@@ -1,4 +1,3 @@
-//const {db} = require('../databases')
 import {db} from '../databases'
 
 function search(uuid, originalText) {

@@ -1,32 +1,8 @@
 const express = require("express");
 const router = express.Router();
 const search = require("../functions/seach");
-import axios from "axios";
+import { TranslationGateway } from "../gateways/TranslationGateway";
 import { Translation, TranslationStorage } from "../storage/TranslationStorage";
-const apiKeyTrad = process.env.API_KEY;
-
-class TranslationGateway {
-  async translate(text: string , targetLanguage: string)  {
-    const encodedParams = new URLSearchParams();
-    encodedParams.append("q", text);
-    encodedParams.append("target", targetLanguage);
-  
-    const options = {
-      method: "POST",
-      url: "https://google-translate1.p.rapidapi.com/language/translate/v2",
-      headers: {
-        "content-type": "application/x-www-form-urlencoded",
-        "Accept-Encoding": "application/gzip",
-        "X-RapidAPI-Key": `${apiKeyTrad}`,
-        "X-RapidAPI-Host": "google-translate1.p.rapidapi.com",
-      },
-      data: encodedParams,
-    };
-  
-    const response = await axios.request(options);
-    return response.data;
-  }
-}
 
 const translationStorage = new TranslationStorage();
 const translationGateway = new TranslationGateway();
@@ -49,8 +25,7 @@ router.post("/", async (req, res) => {
     });
   }
 
-  const translation = await translationGateway.translate(body.text, body.language);
-  const translatedText = translation.data.translations[0].translatedText;
+  const translatedText = await translationGateway.translate(body.text, body.language);
   const savedTranslation: Translation = {
     originalText: body.text,
     translation: translatedText,
@@ -58,16 +33,18 @@ router.post("/", async (req, res) => {
   };
 
   const hasAlreadySavedTranslation =
-    translationStorage.getTranslationById(userId);
+    translationStorage.getById(userId);
   
     
   if (hasAlreadySavedTranslation) {
     hasAlreadySavedTranslation.push(savedTranslation);
-    translationStorage.saveTranslation(userId, hasAlreadySavedTranslation);
+    translationStorage.save(userId, hasAlreadySavedTranslation);
   } else {
-    translationStorage.saveTranslation(userId, [savedTranslation]);
+    translationStorage.save(userId, [savedTranslation]);
   }
   return res.send({
+    originalText: body.text,
+    language: body.language,
     translatedText: translatedText,
   });
 });

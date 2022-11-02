@@ -8,11 +8,11 @@ export type Translation = {
 };
 
 export class TranslationStorage {
-  saveTranslation(userId: string, translation: Translation | Translation[]) {
+  save(userId: string, translation: Translation[]) {
     db.set(userId, translation);
   }
 
-  getTranslationById(userId: string) {
+  getById(userId: string) {
     return db.get(userId);
   }
 }
