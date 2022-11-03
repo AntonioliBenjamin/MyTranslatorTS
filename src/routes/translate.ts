@@ -1,11 +1,10 @@
 const express = require("express");
 const router = express.Router();
-const search = require("../functions/seach");
 import { TranslationGateway } from "../gateways/TranslationGateway";
-import { Translation, TranslationStorage } from "../storage/TranslationStorage";
+import {Translation, InMemoryTranslationStorage,} from "../storage/InMemoryTranslationStorage";
 
-const translationStorage = new TranslationStorage();
-const translationGateway = new TranslationGateway();
+const inMemoryTranslationStorage = new InMemoryTranslationStorage();
+const translationGateway = new TranslationGateway(inMemoryTranslationStorage);
 
 router.post("/", async (req, res) => {
   const body = {
@@ -16,7 +15,7 @@ router.post("/", async (req, res) => {
 
   const userId = req.user.uuid;
 
-  const isAlreadyTranslated = search(userId, body.text);
+  const isAlreadyTranslated = translationGateway.search(userId, body.text);
   if (isAlreadyTranslated) {
     return res.send({
       originalText: body.text,
@@ -25,22 +24,24 @@ router.post("/", async (req, res) => {
     });
   }
 
-  const translatedText = await translationGateway.translate(body.text, body.language);
+  const translatedText = await translationGateway.translate(
+    body.text,
+    body.language,
+  );
+
   const savedTranslation: Translation = {
     originalText: body.text,
     translation: translatedText,
     language: body.language,
   };
 
-  const hasAlreadySavedTranslation =
-    translationStorage.getById(userId);
-  
-    
+  const hasAlreadySavedTranslation = inMemoryTranslationStorage.getById(userId);
+
   if (hasAlreadySavedTranslation) {
     hasAlreadySavedTranslation.push(savedTranslation);
-    translationStorage.save(userId, hasAlreadySavedTranslation);
+    inMemoryTranslationStorage.save(userId, hasAlreadySavedTranslation);
   } else {
-    translationStorage.save(userId, [savedTranslation]);
+    inMemoryTranslationStorage.save(userId, [savedTranslation]);
   }
   return res.send({
     originalText: body.text,
